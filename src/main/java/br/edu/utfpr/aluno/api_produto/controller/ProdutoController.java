@@ -80,4 +80,24 @@ public class ProdutoController {
     }
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Produto não encontrado");
   }
+
+  @PostMapping(path = "/{id}/venda")
+  public ResponseEntity<String> venda(
+      @PathVariable(name = "id") Long idProduto,
+      @RequestBody Produto vendaBody) {
+      Produto produtoVenda = this.produtos.stream()
+        .filter(p -> p.getId().equals(idProduto))
+        .findFirst()
+        .orElse(null);
+
+      if (produtoVenda != null && produtoVenda.getQuantity() >= vendaBody.getQuantity()) {
+        produtoVenda.setQuantity(
+            produtoVenda.getQuantity() - vendaBody.getQuantity()
+            );
+
+        return ResponseEntity.status(HttpStatus.OK).body("venda bem sucedida");
+      }
+
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("requisicao invalida");
+      }
 }
