@@ -1,9 +1,11 @@
 package br.edu.utfpr.aluno.api_produto.controller;
 
+import br.edu.utfpr.aluno.api_produto.dts.ProdutoDTO;
 import br.edu.utfpr.aluno.api_produto.model.Produto;
 import br.edu.utfpr.aluno.api_produto.repositories.ProdutoRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -25,15 +27,6 @@ public class ProdutoController {
     @GetMapping
     public ResponseEntity<List<Produto>> getAll(){
         return ResponseEntity.ok(this.repository.findAll());
-    }
-
-    @GetMapping(path = "/{id}")
-    public ResponseEntity<Produto> getOne(@PathVariable(name = "id") Long idProduto){
-        Produto produtoEncontrado = this.repository.findById(idProduto).orElse(null);
-        if (produtoEncontrado == null)
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        else
-            return ResponseEntity.status(HttpStatus.OK).body(produtoEncontrado);
     }
 
     @PostMapping
@@ -77,6 +70,55 @@ public class ProdutoController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         else
             return ResponseEntity.status(HttpStatus.OK).body(produtos);
+    }
+
+    @GetMapping(path = "/{id}")
+    public ResponseEntity<ProdutoDTO> getOne(@PathVariable(name = "id") Long idProduto){
+        Produto produtoEncontrado = this.repository.findById(idProduto).orElse(null);
+        if (produtoEncontrado == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        else{
+            ProdutoDTO produtoDTO = new ProdutoDTO(
+                    produtoEncontrado.getId(),
+                    produtoEncontrado.getDescription(),
+                    produtoEncontrado.getQuantity(),
+                    produtoEncontrado.getPrice(),
+                    produtoEncontrado.getCategory()
+            );
+            return ResponseEntity.status(HttpStatus.OK).body(produtoDTO);
+        }
+    }
+
+    @PostMapping("/estoque/baixa")
+    public ResponseEntity<Boolean> atualizarEstoque(@RequestBody List<ProdutoDTO> produtos){
+        try {
+            executarBaixa(produtos);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(false);
+        }
+        return ResponseEntity.ok(true);
+    }
+
+    @Transactional
+    public void executarBaixa(List<ProdutoDTO> produtos){
+
+        for (ProdutoDTO item : produtos) {
+            // Verificando se produto existe
+            Produto produto = this.repository.findById(item.id()).orElse(null);
+            if (produto == null) throw new IllegalArgumentException("Produto não encontrado.");
+            // Verifica se produto tem estoque suficiente
+            int novaQuantidade = produto.getQuantity() - item.quantity();
+            if (novaQuantidade < 0) throw new IllegalArgumentException("Produto com estoque insuficiente.");
+        }
+
+        // Faz a atualização dos produtos.
+        for (ProdutoDTO item : produtos) {
+            Produto produto = this.repository.findById(item.id()).orElse(null);
+            int novaQuantidade = produto.getQuantity() - item.quantity();
+            produto.setQuantity(novaQuantidade);
+            this.repository.save(produto);
+        }
+
     }
 
 }
